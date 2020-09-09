@@ -502,7 +502,7 @@ fit_safety=function(fit_function,...){
 }
 
 
-get_both_fits_and_profiles<-function(data){
+get_both_fits_and_profiles<-function(data,threshold_quantile=0.95){
   #Expects data with block (for blocking), group (for fit), identifier and sample
   grouped_maxima<-data[,list(identifier=identifier[1],
                              sample=max(sample)),
@@ -519,12 +519,12 @@ get_both_fits_and_profiles<-function(data){
                  nullfit1000=is.null(fit_1000[[1]])),by=group]
   
   pot_fits<-data[,list(identifier=identifier[1],
-                       fit=list(fit_safety(fpot,x=sample,threshold=quantile(sample,0.95))),
-                       fit_10=list(fit_safety(fpot,x=sample,threshold=quantile(sample,0.95),
+                       fit=list(fit_safety(fpot,x=sample,threshold=quantile(sample,threshold_quantile))),
+                       fit_10=list(fit_safety(fpot,x=sample,threshold=quantile(sample,threshold_quantile),
                                               mper=10,npp=100)),
-                       fit_100=list(fit_safety(fpot,x=sample,threshold=quantile(sample,0.95),
+                       fit_100=list(fit_safety(fpot,x=sample,threshold=quantile(sample,threshold_quantile),
                                                mper=100,npp=100)),
-                       fit_1000=list(fit_safety(fpot,x=sample,threshold=quantile(sample,0.95),
+                       fit_1000=list(fit_safety(fpot,x=sample,threshold=quantile(sample,threshold_quantile),
                                                 mper=1000,npp=100))),by=group]
 
   
@@ -544,13 +544,13 @@ get_both_fits_and_profiles<-function(data){
   return(return)
 }
 
-get_parallel_fits<-function(data,fits_function,num_cores=1){
+get_parallel_fits<-function(data,fits_function,num_cores=1,...){
   # Expects blocked or subset data ready to fit of format group, identifier, sample
   print(paste('running with ',num_cores,' cores.'))
   data[,par_group:=ceiling((group/max(group))*num_cores)]
   setkey(data,'par_group')
   return(foreach(x=1:num_cores, .combine="rbind", .inorder=FALSE) %dopar% 
-           fits_function(data[.(x)]))
+           fits_function(data[.(x)],...))
 }
 
 assign_stats_from_fits<-function(data,include_profiles=T){

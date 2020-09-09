@@ -1,4 +1,145 @@
 
+options(scipen=999)
+range=seq(-6,6,0.01)
+dist=rbindlist(list(data.table(x=range,
+                               Density=dgev(range,
+                                            loc=0,
+                                            2,
+                                            0.5),
+                               Distribution = 'Fréchet (ξ=0.5)'),
+                    data.table(x=range,
+                               Density=dgev(range,
+                                      loc=0,
+                                      2,
+                                      0),
+                               Distribution = 'Gumbel (ξ=0)'),
+                    data.table(x=range,
+                               Density=dgev(range,
+                                      loc=0,
+                                      2,
+                                      -0.5),
+                               Distribution = 'Reverse Weibull (ξ=-0.5)')
+))
+
+ggplot(dist,aes(x=x))+geom_line(aes(y=Density,col=Distribution),alpha=0.9)+
+  geom_vline(xintercept = -4,col='red',linetype="dashed")+
+  geom_vline(xintercept = 4,col='blue',linetype="dashed")+
+  xlim(-6,6)+
+  theme_classic()+
+  scale_y_continuous(name = 'Density',breaks=NULL)
+ggsave("~/3_density_dist.png")
+
+####Generate normalisation sequence plot####
+set.seed(57)
+data=generate_grouped_data(10000,100000,rexp,num_cores=40)
+data[,in_group_index:=1:.N,by=group]
+data[,block:=ceiling(in_group_index/100)]
+data[,w_1:=cos(2*pi*(in_group_index-1)/100)]
+data[,w_2:=cos(2*pi*(in_group_index-1)/1000)]
+data[,w_constant:=w_1+w_2]
+data[,very_broken_rand:=rand+1*w_constant]
+setkey(data,'group')
+grouped_maximums<-data[,list(M_10=max(rand[in_group_index<=10]),
+                             M_100=max(rand[in_group_index<=100]),
+                             M_1000=max(rand[in_group_index<=1000]),
+                             M_10000=max(rand[in_group_index<=10000]),
+                             M_100000=max(rand[in_group_index<=100000])
+)
+,by=group]
+
+
+grouped_maximums<-melt(grouped_maximums[,!c("group"),with=F])
+grouped_maximums[,int_n:=as.integer(gsub('M_','',variable))]
+grouped_maximums[,n:=as.factor(int_n)]
+
+
+ggplot(grouped_maximums,aes(x=value,col=n,group=n))+
+  geom_density()+
+  xlab(expression("M"[n]))+
+  scale_y_continuous(name = 'Density', limits = c(0,0.5),breaks=NULL)+
+  theme_classic()
+ggsave("~/exp_plots_1.png")
+
+ggplot(grouped_maximums,aes(x=(value-log(int_n)),col=n,group=n))+
+  geom_density()+
+  geom_line(data=data.table(x=seq(-3,5,0.01),
+                            y=dgev(seq(-3,5,0.01),loc = 0,scale=1,shape=0)),
+            aes(x=x,y=y,group='GEV',linetype='GEV'),col='black',linetype='dashed')+
+  scale_x_continuous(name=expression("M"[n]^"*"),limits=c(-3,5))+
+  scale_y_continuous(name = 'Density', limits = c(0,0.5),breaks=NULL)+
+  theme_classic()
+ggsave("~/exp_plots_2.png")
+
+
+
+broken_grouped_maximums<-rbind(data[in_group_index<100000,
+                                    list(position=position[which.max(very_broken_rand)],
+                                         max=max(very_broken_rand)-log(sum(.N)),
+                                         n=100000
+                                    ),by=group],
+                               data[in_group_index<10000,
+                                    list(position=position[which.max(very_broken_rand)],
+                                         max=max(very_broken_rand)-log(sum(.N)),
+                                         n=10000
+                                    ),by=group],
+                               data[in_group_index<1000,
+                                    list(position=position[which.max(very_broken_rand)],
+                                         max=max(very_broken_rand)-log(sum(.N)),
+                                         n=1000
+                                    ),by=group],
+                               data[in_group_index<100,
+                                    list(position=position[which.max(very_broken_rand)],
+                                         max=max(very_broken_rand)-log(sum(.N)),
+                                         n=100
+                                    ),by=group],
+                               data[in_group_index<10,
+                                    list(position=position[which.max(very_broken_rand)],
+                                         max=max(very_broken_rand)-log(sum(.N)),
+                                         n=10
+                                    ),by=group]
+)
+
+
+
+ggplot(broken_grouped_maximums[,list(max,n=as.factor(n))],aes(x=max,col=n))+
+  geom_density()+
+  geom_line(data=data.table(x=seq(-3,10,0.01),
+                            y=dgev(seq(-3,10,0.01),loc = 0,scale=1,shape=0)),
+            aes(x=x,y=y),col='black',linetype='dashed')+
+  geom_line(data=data.table(x=seq(-3,10,0.01),
+                            y=dgev(seq(-3,10,0.01),loc = 2,scale=1,shape=0)),
+            aes(x=x,y=y),col='black',linetype='dashed')+
+  scale_x_continuous(name=expression("M"[n]^"*"),limits=c(-3,10))+
+  scale_y_continuous(name = 'Density', limits = c(0,0.5),breaks=NULL)+
+  theme_classic()
+ggsave("~/e_d_normalised.png")
+
+set.seed(102)
+data_2=generate_grouped_data(10000,100000,rnorm,num_cores=40)
+data_2[,in_group_index:=1:.N,by=group]
+setkey(data_2,'group')
+grouped_maximums_2<-data_2[,list(M_10=max(rand[in_group_index<=10]),
+                                 M_100=max(rand[in_group_index<=100]),
+                                 M_1000=max(rand[in_group_index<=1000]),
+                                 M_10000=max(rand[in_group_index<=10000]),
+                                 M_100000=max(rand[in_group_index<=100000]))
+                           ,by=group]
+grouped_maximums_2<-melt(grouped_maximums_2[,!c("group"),with=F])
+grouped_maximums_2[variable=='M_10',n:=10]
+grouped_maximums_2[variable=='M_100',n:=100]
+grouped_maximums_2[variable=='M_1000',n:=1000]
+grouped_maximums_2[variable=='M_10000',n:=10000]
+grouped_maximums_2[variable=='M_100000',n:=100000]
+grouped_maximums_2[,n:=as.factor(n)]
+
+ggplot(grouped_maximums_2,aes(x=value,col=n,group=n))+
+  geom_density()+
+  xlab(expression("M"[n]))+
+  scale_y_continuous(name = 'Density', limits = c(0,1.8),breaks=NULL)+
+  theme_classic()
+ggsave("~/a_b_plots.png")
+
+
 set.seed(57)
 
 data_3=generate_grouped_data(1000000,100,rexp,num_cores=40)
@@ -199,18 +340,28 @@ multiplerror(x,y,sex,sey){
 
 rand_stats[,shape_diff:=fitgev[[1]]$estimate[['shape']]-fitgpd[[1]]$estimate[['shape']],
                   by=group]
-rand_stats[,shape_diff_err:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+(fitgev[[1]]$std.err[['shape']]^2)-3.345345e-05),
+rand_stats[,shape_diff_err:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+(fitgev[[1]]$std.err[['shape']]^2)),
                   by=group]
 broken_stats[,shape_diff:=fitgev[[1]]$estimate[['shape']]-fitgpd[[1]]$estimate[['shape']],
                   by=group]
-broken_stats[,shape_diff_err:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+(fitgev[[1]]$std.err[['shape']]^2)-3.345345e-05),
+broken_stats[,shape_diff_err:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+(fitgev[[1]]$std.err[['shape']]^2)),
                   by=group]
 very_broken_stats[,shape_diff:=fitgev[[1]]$estimate[['shape']]-fitgpd[[1]]$estimate[['shape']],
            by=group]
-very_broken_stats[,shape_diff_err:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+(fitgev[[1]]$std.err[['shape']]^2)-3.345345e-05),
+very_broken_stats[,shape_diff_err:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+(fitgev[[1]]$std.err[['shape']]^2)),
            by=group]
 
 ggplot(rand_stats,aes(x=shape_diff))+geom_density()+
+  geom_line(data=data.table(x=seq(-0.25,0.25,0.01),
+                            y=dnorm(seq(-0.25,0.25,0.01),
+                                    mean=0,
+                                    sd=mean(rand_stats[,shape_diff_err_2]))),
+            aes(x=x,y=y),col='blue',alpha=0.5)+
+  geom_line(data=data.table(x=seq(-0.25,0.25,0.01),
+                            y=dnorm(seq(-0.25,0.25,0.01),
+                                    mean=0,
+                                    sd=sd(rand_stats[,shape_diff]))),
+            aes(x=x,y=y),col='green',alpha=0.5)+
   geom_line(data=data.table(x=seq(-0.25,0.25,0.01),
                             y=dnorm(seq(-0.25,0.25,0.01),
                                     mean=0,
@@ -220,52 +371,80 @@ ggplot(rand_stats,aes(x=shape_diff))+geom_density()+
                                       rand_stats[,list(a=fitgpd[[1]]$estimate[['shape']],
                                                        b=fitgev[[1]]$estimate[['shape']]),
                                                  by=group][,2*cov(b,a)]))),
-            aes(x=x,y=y),col='red')+
-  geom_line(data=data.table(x=seq(-0.25,0.25,0.01),
-                            y=dnorm(seq(-0.25,0.25,0.01),
-                                    mean=0,
-                                    sd=sqrt(
-                                      (sd(rand_stats[,fitgev[[1]]$estimate[['shape']],by=group]$V1)^2+
-                                      sd(rand_stats[,fitgpd[[1]]$estimate[['shape']],by=group]$V1)^2)/2))),
-            aes(x=x,y=y),col='green')
+            aes(x=x,y=y),col='red',alpha=0.5)
 
 rand_stats[,1-mean(inrange(0,shape_diff-1.96*shape_diff_err,shape_diff+1.96*shape_diff_err))]
 broken_stats[,1-mean(inrange(0,shape_diff-1.96*shape_diff_err,shape_diff+1.96*shape_diff_err))]
 very_broken_stats[,1-mean(inrange(0,shape_diff-1.96*shape_diff_err,shape_diff+1.96*shape_diff_err))]
 
-rand_stats[,mean(inrange(0,shape_diff-qnorm(0.9)*shape_diff_err,shape_diff+qnorm(0.9)*shape_diff_err))]
-broken_stats[,mean(inrange(0,shape_diff-qnorm(0.9)*shape_diff_err,shape_diff+qnorm(0.9)*shape_diff_err))]
-very_broken_stats[,mean(inrange(0,shape_diff-qnorm(0.9)*shape_diff_err,shape_diff+qnorm(0.9)*shape_diff_err))]
-
 #With sample SD and Cov 
+rand_cov = rand_stats[,list(a=fitgpd[[1]]$estimate[['shape']],
+                           b=fitgev[[1]]$estimate[['shape']]),
+                     by=group][,cov(b,a)]
+rand_cor = rand_stats[,list(a=fitgpd[[1]]$estimate[['shape']],
+                            b=fitgev[[1]]$estimate[['shape']]),
+                      by=group][,cor(b,a)]
+
 rand_sd=sqrt(
   sd(rand_stats[,fitgev[[1]]$estimate[['shape']],by=group]$V1)^2+
     sd(rand_stats[,fitgpd[[1]]$estimate[['shape']],by=group]$V1)^2-
-    rand_stats[,list(a=fitgpd[[1]]$estimate[['shape']],
-                     b=fitgev[[1]]$estimate[['shape']]),
-               by=group][,2*cov(b,a)])
+    2*rand_cov)
+rand_sd_2=sqrt(
+     sd(rand_stats[,fitgev[[1]]$estimate[['shape']],by=group]$V1)^2+
+         sd(rand_stats[,fitgpd[[1]]$estimate[['shape']],by=group]$V1)^2-
+         2*rand_cor*sd(rand_stats[,fitgev[[1]]$estimate[['shape']],by=group]$V1)*
+       sd(rand_stats[,fitgpd[[1]]$estimate[['shape']],by=group]$V1))
+
+
+broken_cov = broken_stats[,list(a=fitgpd[[1]]$estimate[['shape']],
+                                b=fitgev[[1]]$estimate[['shape']]),
+                          by=group][,cov(b,a)]
 broken_sd=sqrt(
   sd(broken_stats[,fitgev[[1]]$estimate[['shape']],by=group]$V1)^2+
     sd(broken_stats[,fitgpd[[1]]$estimate[['shape']],by=group]$V1)^2-
-    broken_stats[,list(a=fitgpd[[1]]$estimate[['shape']],
-                     b=fitgev[[1]]$estimate[['shape']]),
-               by=group][,2*cov(b,a)])
+    2*broken_cov)
+
+vb_cov=very_broken_stats[,list(a=fitgpd[[1]]$estimate[['shape']],
+                               b=fitgev[[1]]$estimate[['shape']]),
+                         by=group][,cov(b,a)]
 very_broken_sd=sqrt(
   sd(very_broken_stats[,fitgev[[1]]$estimate[['shape']],by=group]$V1)^2+
     sd(very_broken_stats[,fitgpd[[1]]$estimate[['shape']],by=group]$V1)^2-
-    very_broken_stats[,list(a=fitgpd[[1]]$estimate[['shape']],
-                     b=fitgev[[1]]$estimate[['shape']]),
-               by=group][,2*cov(b,a)])
+    2*vb_cov)
 
-rand_stats[,mean(inrange(0,shape_diff-1.96*rand_sd,shape_diff+1.96*rand_sd))]
-broken_stats[,mean(inrange(0,shape_diff-1.96*broken_sd,shape_diff+1.96*broken_sd))]
-very_broken_stats[,mean(inrange(0,shape_diff-1.96*very_broken_sd,shape_diff+1.96*very_broken_sd))]
+rand_stats[,1-mean(inrange(0,shape_diff-1.96*rand_sd,shape_diff+1.96*rand_sd))]
+broken_stats[,1-mean(inrange(0,shape_diff-1.96*rand_sd,shape_diff+1.96*rand_sd))]
+very_broken_stats[,1-mean(inrange(0,shape_diff-1.96*rand_sd,shape_diff+1.96*rand_sd))]
 
 
 ggplot(rbind(rand_stats[,list(Distribution="w=0",shape_diff)],
              broken_stats[,list(Distribution="w=0.5",shape_diff)],
              very_broken_stats[,list(Distribution="w=1",shape_diff)]),
        aes(x=shape_diff,col=Distribution))+geom_density()
+
+rand_stats[,shape_diff_err_2:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+
+                                   (fitgev[[1]]$std.err[['shape']]^2)-(2*
+             rand_cor*fitgpd[[1]]$std.err[['shape']]*fitgev[[1]]$std.err[['shape']])),
+           by=group]
+broken_stats[,shape_diff_err_2:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+
+                                     (fitgev[[1]]$std.err[['shape']]^2)-2*
+               rand_cor*fitgpd[[1]]$std.err[['shape']]*fitgev[[1]]$std.err[['shape']]),
+             by=group]
+very_broken_stats[,shape_diff_err_2:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+
+                                          (fitgev[[1]]$std.err[['shape']]^2)-2*
+                rand_cor*fitgpd[[1]]$std.err[['shape']]*fitgev[[1]]$std.err[['shape']]),
+              by=group]
+
+rand_stats[,1-mean(inrange(0,shape_diff-1.96*shape_diff_err_2,shape_diff+1.96*shape_diff_err_2))]
+broken_stats[,1-mean(inrange(0,shape_diff-1.96*shape_diff_err_2,shape_diff+1.96*shape_diff_err_2))]
+very_broken_stats[,1-mean(inrange(0,shape_diff-1.96*shape_diff_err_2,shape_diff+1.96*shape_diff_err_2))]
+
+corr_check<-merge(rand_stats[,list(I=1,gpdshape=fitgpd[[1]]$std.err[['shape']]),by=group],
+             rand_stats[,list(I=1,gevshape=fitgev[[1]]$std.err[['shape']]),by=group],
+             by="I",allow.cartesian=T)
+corr_check[,shape_diff:=gevshape-gpdshape]
+corr_check[,cor(gevshape,gpdshape)]
+corr_check[,sd(shape_diff)]
 
 ###AD REJECTION_RATES####
 get_specified_ad_agreements<-function(data,gev_shape=NULL,
@@ -552,232 +731,5 @@ ggplot(results2[offset!=-1,list(gev_prof=mean(gev_prof)),by=list(offset,Distribu
        aes(x=offset,y=gev_prof,col=Distribution))+geom_point(size=0.1)+
   theme_classic()+xlab('i')+ylab(expression("p"["z0.001"]))
 ggsave('~/gev_97.png')
-####OLD####
-
-block_maxima[,list(.N,
-                   actual_10_return=1/mean(rand>=rand_stats[identifier==1,estimated_10_return]),
-                   actual_100_return=1/mean(rand>=rand_stats[identifier==1,estimated_100_return]),
-                   actual_1000_return=1/mean(rand>=rand_stats[identifier==1,estimated_1000_return])),
-             by=list(position_in_cycle=block%%10)]
-
-block_maxima[,list(.N,actual_100_return=1/mean(broken_rand>=broken_stats[identifier==1,estimated_100_return]),
-                   actual_1000_return=1/mean(broken_rand>=broken_stats[identifier==1,estimated_1000_return])),
-             by=list(position_in_cycle=block%%10)]
-
-block_maxima[,list(.N,actual_100_return=1/mean(very_broken_rand>=very_broken_stats[identifier==1,estimated_100_return]),
-                   actual_1000_return=1/mean(very_broken_rand>=very_broken_stats[identifier==1,estimated_1000_return])),
-             by=list(position_in_cycle=block%%10)]
 
 
-to_plot<-rbind(rand_stats[,list(estimated_loc,estimated_shape,estimated_scale,type='Standard')],
-               broken_stats[,list(estimated_loc,estimated_shape,estimated_scale,type='W=0.5')],
-               very_broken_stats[,list(estimated_loc,estimated_shape,estimated_scale,type='W=1')])
-nums<-seq(to_plot[,min(estimated_loc)],to_plot[,max(estimated_loc)],0.01)
-normals_to_plot<-rbind(data.table(nums, type='Theoretical normal distribution, W=0',
-                                  estimated_loc=dnorm(nums,
-                                                      mean=mean(rand_stats$estimated_loc),
-                                                      sd=mean(rand_stats$loc_err))),
-                       data.table(nums, type='Theoretical normal distribution, W=0.5',
-                                  estimated_loc=dnorm(nums,
-                                                      mean=mean(broken_stats$estimated_loc),
-                                                      sd=mean(broken_stats$loc_err))),
-                       data.table(nums, type='Theoretical normal distribution, W=1',
-                                  estimated_loc=dnorm(nums,
-                                                      mean=mean(very_broken_stats$estimated_loc),
-                                                      sd=mean(very_broken_stats$loc_err))))
-
-ggplot(data=to_plot,aes(x=estimated_loc,col=type))+
-  geom_line(data=normals_to_plot,aes(x=nums,y=estimated_loc,linetype=type),col='black')+geom_density()
-
-
-nums<-seq(to_plot[,min(estimated_scale)],to_plot[,max(estimated_scale)],0.01)
-normals_to_plot<-rbind(data.table(nums, type='Theoretical normal distribution, W=0',
-                                  estimated_scale=dnorm(nums,
-                                                        mean=mean(rand_stats$estimated_scale),
-                                                        sd=mean(rand_stats$scale_err))),
-                       data.table(nums, type='Theoretical normal distribution, W=0.5',
-                                  estimated_scale=dnorm(nums,
-                                                        mean=mean(broken_stats$estimated_scale),
-                                                        sd=mean(broken_stats$scale_err))),
-                       data.table(nums, type='Theoretical normal distribution, W=1',
-                                  estimated_scale=dnorm(nums,
-                                                        mean=mean(very_broken_stats$estimated_scale),
-                                                        sd=mean(very_broken_stats$scale_err))))
-
-ggplot(data=to_plot,aes(x=estimated_scale,col=type))+
-  geom_line(data=normals_to_plot,aes(x=nums,y=estimated_scale,linetype=type),col='black')+geom_density()
-
-
-nums<-seq(to_plot[,min(estimated_shape)],to_plot[,max(estimated_shape)],0.01)
-normals_to_plot<-rbind(data.table(nums, type='Theoretical normal distribution, W=0',
-                                  estimated_shape=dnorm(nums,
-                                                        mean=mean(rand_stats$estimated_shape),
-                                                        sd=mean(rand_stats$shape_err))),
-                       data.table(nums, type='Theoretical normal distribution, W=0.5',
-                                  estimated_shape=dnorm(nums,
-                                                        mean=mean(broken_stats$estimated_shape),
-                                                        sd=mean(broken_stats$shape_err))),
-                       data.table(nums, type='Theoretical normal distribution, W=1',
-                                  estimated_shape=dnorm(nums,
-                                                        mean=mean(very_broken_stats$estimated_shape),
-                                                        sd=mean(very_broken_stats$shape_err))))
-
-ggplot(data=to_plot,aes(x=estimated_shape,col=type))+
-  geom_line(data=normals_to_plot,aes(x=nums,y=estimated_shape,linetype=type),col='black')+geom_density()
-
-#profile_log_likelihoods
-
-profile<-profile(fgev_fit_non_broken_1)
-prof_loc<-as.data.table(profile$loc)
-prof_shape<-as.data.table(profile$shape)
-prof_scale<-as.data.table(profile$scale)
-asymptotic_confint<-confint(fgev_fit_non_broken_1)
-profile_confint<-confint(profile)
-
-return_val_check<-get_gev_return_value_and_std.err(0.001,fgev_fit_non_broken_1)
-
-seq_of_interest<-seq(return_val_check['estimate']-2.8*return_val_check['se'],
-                     return_val_check['estimate']+2.8*return_val_check['se'],
-                     length.out=30)
-
-
-thing<--get_gev_profile_return_log_likelihood(seq_of_interest, fgev_fit_non_broken_1$data, 
-                                              0.001, 1, 0)
-
-
-#Simulated
-
-ggplot(rand_stats,aes(x=estimated_10_return,y =..density..))+geom_density()+
-  geom_line(data=data.table(x=seq(min(rand_stats$estimated_10_return),
-                                  max(rand_stats$estimated_10_return),
-                                  0.01),
-                            y=dnorm(seq(min(rand_stats$estimated_10_return),
-                                        max(rand_stats$estimated_10_return),
-                                        0.01),
-                                    mean=rand_stats[1,estimated_10_return],
-                                    sd=rand_stats[1,return_10_err])),aes(x=x,y=y),col='green')
-
-ggplot(broken_stats,aes(x=estimated_10_return))+geom_density()+
-  geom_line(data=data.table(x=seq(min(broken_stats$estimated_10_return),
-                                  max(broken_stats$estimated_10_return),
-                                  0.01),
-                            y=dnorm(seq(min(broken_stats$estimated_10_return),
-                                        max(broken_stats$estimated_10_return),
-                                        0.01),
-                                    mean=broken_stats[1,estimated_10_return],
-                                    sd=broken_stats[1,return_10_err])),aes(x=x,y=y),col='green')
-
-ggplot(very_broken_stats,aes(x=estimated_10_return))+geom_density()+
-  geom_line(data=data.table(x=seq(min(very_broken_stats$estimated_10_return),
-                                  max(very_broken_stats$estimated_10_return),
-                                  0.01),
-                            y=dnorm(seq(min(very_broken_stats$estimated_10_return),
-                                        max(very_broken_stats$estimated_10_return),
-                                        0.01),
-                                    mean=very_broken_stats[1,estimated_10_return],
-                                    sd=very_broken_stats[1,return_10_err])),aes(x=x,y=y),col='green')
-#rand
-
-
-rand_model=fgev(block_maxima[1:500000,rand])
-loc=rand_model$estimate[['loc']]
-shape=rand_model$estimate[['shape']]
-scale=rand_model$estimate[['scale']]
-
-get_a_d_stat(block_maxima[group==1,rand],
-             loc=loc,
-             shape=shape,
-             scale=scale)
-
-rand_sim_data<-data.table(sample=rgev(10000000,
-                                      loc=loc,
-                                      scale=scale,
-                                      shape=shape),
-                          group=ceiling(1:10000000/100))
-registerDoMC(cores=40)
-rand_sim_stats<-parallel_stat_acquisition(rand_sim_data,
-                                          loc=loc,
-                                          scale=scale,
-                                          shape=shape,
-                                          group_size=100,replicates=100000)
-rand_sim_stats[,quantile(AD,0.99)]
-
-rand_returns_10<-get_gev_return_value_and_std.err(0.1,
-                                                  loc,
-                                                  scale,
-                                                  shape)
-rand_returns_100<-get_gev_return_value_and_std.err(0.01,
-                                                   loc,
-                                                   scale,
-                                                   shape)
-rand_returns_1000<-get_gev_return_value_and_std.err(0.001,
-                                                    loc,
-                                                    scale,
-                                                    shape)
-
-block_maxima[,list(.N,
-                   actual_10_return=1/mean(rand>=rand_returns_10[['estimate']]),
-                   actual_100_return=1/mean(rand>=rand_returns_100[['estimate']]),
-                   actual_1000_return=1/mean(rand>=rand_returns_1000[['estimate']])),
-             by=list(position_in_cycle=block%%10)]
-
-ggplot(rand_sim_stats,aes(x=estimated_10_return))+geom_density()+
-  geom_line(data=data.table(x=seq(min(rand_sim_stats$estimated_10_return),
-                                  max(rand_sim_stats$estimated_10_return),
-                                  0.01),
-                            y=dnorm(seq(min(rand_sim_stats$estimated_10_return),
-                                        max(rand_sim_stats$estimated_10_return),
-                                        0.01),
-                                    mean=rand_returns_10[['estimate']],
-                                    sd=rand_returns_10[['se']])),aes(x=x,y=y),col='green')
-
-#very_broken
-
-
-
-get_a_d_stat(block_maxima[group<10,very_broken_rand],
-             loc=loc,
-             shape=shape,
-             scale=scale)
-
-vb_sim_data<-data.table(sample=rgev(10000000,
-                                    loc=loc,
-                                    scale=scale,
-                                    shape=shape),
-                        group=ceiling(1:10000000/100))
-registerDoMC(cores=40)
-vb_sim_stats<-parallel_stat_acquisition(vb_sim_data,
-                                        loc=loc,
-                                        scale=scale,
-                                        shape=shape,
-                                        group_size=100,replicates=100000)
-vb_sim_stats[,quantile(AD,0.99)]
-
-vb_returns_10<-get_gev_return_value_and_std.err(0.1,
-                                                loc,
-                                                scale,
-                                                shape)
-vb_returns_100<-get_gev_return_value_and_std.err(0.01,
-                                                 loc,
-                                                 scale,
-                                                 shape)
-vb_returns_1000<-get_gev_return_value_and_std.err(0.001,
-                                                  loc,
-                                                  scale,
-                                                  shape)
-block_maxima[,list(.N,
-                   actual_10_return=1/mean(very_broken_rand>=vb_returns_10[['estimate']]),
-                   actual_100_return=1/mean(very_broken_rand>=vb_returns_100[['estimate']]),
-                   actual_1000_return=1/mean(very_broken_rand>=vb_returns_1000[['estimate']])),
-             by=list(position_in_cycle=block%%10)]
-vb_to_plot<-rbind(very_broken_stats[,list(estimated_10_return,type='Broken')],
-                  vb_sim_stats[,list(estimated_10_return,type='Simulated')])
-ggplot(vb_to_plot,aes(x=estimated_10_return,col=type))+geom_density()+
-  geom_line(data=data.table(x=seq(min(vb_sim_stats$estimated_10_return),
-                                  max(vb_sim_stats$estimated_10_return),
-                                  0.01),
-                            y=dnorm(seq(min(vb_sim_stats$estimated_10_return),
-                                        max(vb_sim_stats$estimated_10_return),
-                                        0.01),
-                                    mean=vb_returns_10[['estimate']],
-                                    sd=vb_returns_10[['se']])),aes(x=x,y=y),col='green')
