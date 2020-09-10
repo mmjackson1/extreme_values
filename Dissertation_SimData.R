@@ -31,7 +31,7 @@ ggsave("~/3_density_dist.png")
 
 ####Generate normalisation sequence plot####
 set.seed(57)
-data=generate_grouped_data(10000,100000,rexp,num_cores=40)
+data=generate_grouped_data(10000,100000,rexp,num_cores=1)
 data[,in_group_index:=1:.N,by=group]
 data[,block:=ceiling(in_group_index/100)]
 data[,w_1:=cos(2*pi*(in_group_index-1)/100)]
@@ -115,7 +115,7 @@ ggplot(broken_grouped_maximums[,list(max,n=as.factor(n))],aes(x=max,col=n))+
 ggsave("~/e_d_normalised.png")
 
 set.seed(102)
-data_2=generate_grouped_data(10000,100000,rnorm,num_cores=40)
+data_2=generate_grouped_data(10000,100000,rnorm,num_cores=1)
 data_2[,in_group_index:=1:.N,by=group]
 setkey(data_2,'group')
 grouped_maximums_2<-data_2[,list(M_10=max(rand[in_group_index<=10]),
@@ -142,7 +142,7 @@ ggsave("~/a_b_plots.png")
 
 set.seed(57)
 
-data_3=generate_grouped_data(1000000,100,rexp,num_cores=40)
+data_3=generate_grouped_data(1000000,100,rexp,num_cores=1)
 setnames(data_3,'group','block')
 data_3<-data_3[order(block)]
 data_3[,group:=ceiling(block/100)]

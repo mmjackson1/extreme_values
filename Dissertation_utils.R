@@ -478,6 +478,20 @@ get_both_fits<-function(data){
   return(return)
 }
 
+get_both_fits_no_err<-function(data){
+  #Expects data with block (for blocking), group (for fit), identifier and sample
+  grouped_maxima<-data[,list(identifier=identifier[1],
+                             sample=max(sample)),
+                       by=list(group,block)]
+  
+  gev_fits<-grouped_maxima[,list(identifier=identifier[1],
+                                 fit=list(fgev(sample,std.err = F))),by=group]
+  pot_fits<-data[,list(identifier=identifier[1],
+                       fit=list(fpot(sample,std.err = F,threshold=quantile(sample,0.95)))),by=group]
+  return<-merge(gev_fits,pot_fits,by=c('identifier','group'),suffixes=c('gev','gpd'))
+  return(return)
+}
+
 get_both_fits_shape_0<-function(data){
   #Expects data with block (for blocking), group (for fit), identifier and sample
   grouped_maxima<-data[,list(identifier=identifier[1],

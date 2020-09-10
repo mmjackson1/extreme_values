@@ -8,7 +8,7 @@ gc()
 
 #Test with altered group sizes but same threshold selection mechanism and underlying parameters
 set.seed(57)
-cor_test_data<-generate_grouped_data(2000000,50,rexp,num_cores=40)
+cor_test_data<-generate_grouped_data(2000000,50,rexp,num_cores=1)
 setnames(cor_test_data,'group','block')
 cor_test_data<-cor_test_data[order(block)]
 cor_test_data[,group:=ceiling(block/200)]
@@ -27,7 +27,7 @@ gc()
 
 #Test with altered loc
 set.seed(57)
-cor_test_data<-generate_grouped_data(1000000,100,rexp,num_cores=40)
+cor_test_data<-generate_grouped_data(1000000,100,rexp,num_cores=1)
 setnames(cor_test_data,'group','block')
 cor_test_data<-cor_test_data[order(block)]
 cor_test_data[,group:=ceiling(block/100)]
@@ -46,7 +46,7 @@ gc()
 
 #Test with altered scale
 set.seed(57)
-cor_test_data<-generate_grouped_data(1000000,100,rexp,num_cores=40)
+cor_test_data<-generate_grouped_data(1000000,100,rexp,num_cores=1)
 setnames(cor_test_data,'group','block')
 cor_test_data<-cor_test_data[order(block)]
 cor_test_data[,group:=ceiling(block/100)]
@@ -64,14 +64,15 @@ gc()
 
 #Test with altered shape
 set.seed(57)
-cor_test_data<-generate_grouped_data(1000000,100,rnorm,num_cores=40)
+cor_test_data<-generate_grouped_data(1000000,100,rfrechet,num_cores=1)
 setnames(cor_test_data,'group','block')
 cor_test_data<-cor_test_data[order(block)]
 cor_test_data[,group:=ceiling(block/100)]
+cor_test_data[,rand:=rand/100]
 setkey(cor_test_data,'block')
 
 cor_test_stats_shape<-get_parallel_fits(cor_test_data[,list(block,group,identifier='rand_stats',sample=rand)],
-                                        get_both_fits_and_profiles,num_cores=20)
+                                        get_both_fits_no_err,num_cores=20)
 save(cor_test_stats_shape,file='~/dissertation/cor_test_stats_shape.RData')
 cor_test_shape = cor_test_stats_shape[,list(a=fitgpd[[1]]$estimate[['shape']],
                                             b=fitgev[[1]]$estimate[['shape']]),
@@ -81,7 +82,7 @@ gc()
 
 #Test with altered threshold
 set.seed(57)
-cor_test_data<-generate_grouped_data(1000000,100,rexp,num_cores=40)
+cor_test_data<-generate_grouped_data(1000000,100,rexp,num_cores=1)
 setnames(cor_test_data,'group','block')
 cor_test_data<-cor_test_data[order(block)]
 cor_test_data[,group:=ceiling(block/100)]
