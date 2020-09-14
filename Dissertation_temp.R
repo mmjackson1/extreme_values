@@ -166,3 +166,21 @@ ggplot(temp_runforward_models[,list(Year,Quantile=pnorm(shape_diff,0,shape_diff_
        aes(x=Year,y=Quantile))+geom_point()+theme_classic()
 ggsave('~/temp_runforward.png')
 
+####Bootstraps####
+set.seed(10)
+temp_bootstrap_data<-lapply(1:10000,function(x){temp_data[,list(sample=sample(temp_data$sample,replace = T),
+                                                                  block,
+                                                                  identifier='temp_bootstrap-100',
+                                                                  group=x)]})
+temp_bootstrap_data<-rbindlist(temp_bootstrap_data)
+
+temp_bootstrap_fits<-get_parallel_fits(temp_bootstrap_data,get_both_fits_no_err,num_cores=8)
+temp_bootstrap_cor = temp_bootstrap_fits[,list(a=fitgpd[[1]]$estimate[['shape']],
+                                                 b=fitgev[[1]]$estimate[['shape']]),
+                                           by=group][,cor(b,a)]
+
+temp_models[,shape_diff_err_known_corr:=sqrt((fitgpd[[1]]$std.err[['shape']]^2)+(fitgev[[1]]$std.err[['shape']]^2)-
+                                                2*temp_bootstrap_cor*fitgpd[[1]]$std.err[['shape']]*fitgev[[1]]$std.err[['shape']]),
+             by=group]
+temp_models[,inrange(0,shape_diff-1.96*shape_diff_err_known_corr,shape_diff+1.96*shape_diff_err_known_corr)]
+temp_models[,pnorm(shape_diff,0,shape_diff_err_known_corr)*100]
